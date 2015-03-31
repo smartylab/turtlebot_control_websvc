@@ -14,16 +14,20 @@ NODE_NAME = "turtlebot_control_websvc"
 
 
 class TurtleBotControlWebSvc(tornado.web.RequestHandler):
+
     exposed = True
-    cnt = 0
 
     def initialize(self, pub):
         self.pub = pub
 
     def get(self):
-        linear = self.get_argument("linear", '0')
-        angular = self.get_argument("angular", '0')
+        linear = float(self.get_argument("linear", '0'))
+        angular = float(self.get_argument("angular", '0'))
+        print("Message arrived {linear: %s, angular: %s}" % (str(linear), str(angular)))
+        self.control(linear, angular)
+        self.write("OK")
 
+    def control(self, linear, angular):
         ctr_msg = geometry_msgs.Twist()
         ctr_msg.linear.y = 0.0
         ctr_msg.linear.z = 0.0
@@ -31,27 +35,24 @@ class TurtleBotControlWebSvc(tornado.web.RequestHandler):
         ctr_msg.angular.y = 0.0
 
         try:
-            ctr_msg.linear.x = float(linear)
+            ctr_msg.linear.x = linear
             print("Linear: "+str(linear))
         except:
             ctr_msg.linear.x = 0.0
 
         try:
-            ctr_msg.angular.z = float(angular)
+            ctr_msg.angular.z = angular
             print("Angular: "+str(angular))
         except:
             ctr_msg.angular.z = 0.0
 
         self.pub.publish(ctr_msg)
 
-        self.write("Hello.")
-
 
 class TurtleBotControlServer(threading.Thread):
     def __init__(self, pub):
         threading.Thread.__init__(self)
         self.pub = pub
-        self.mot_pub = mot_pub
 
     def run(self):
         print("Starting web server...")
@@ -63,7 +64,7 @@ class TurtleBotControlServer(threading.Thread):
         tornado.ioloop.IOLoop.instance().start()
 
     def stop(self):
-        self.__stop = True
+        tornado.ioloop.IOLoop.instance().stop()
 
 
 def echo(msg):
@@ -79,8 +80,8 @@ if __name__ == '__main__':
     mot_pub = rospy.Publisher('/mobile_base/commands/motor_power',MotorPower, queue_size=10)
     mot_pub.publish(MotorPower(MotorPower.ON))
 
-    pub = rospy.Publisher("/cmd_vel_mux/input/teleop", geometry_msgs.Twist, queue_size=10)
-    sub = rospy.Subscriber("/cmd_vel_mux/input/teleop", geometry_msgs.Twist, echo)
+    pub = rospy.Publisher("/cmd_vel_mux/input/safety_controller", geometry_msgs.Twist, queue_size=10)
+    sub = rospy.Subscriber("/cmd_vel_mux/input/safety_controller", geometry_msgs.Twist, echo)
 
     server = TurtleBotControlServer(pub)
     server.start()
